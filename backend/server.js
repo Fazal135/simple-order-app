@@ -3,6 +3,7 @@ const express = require('express');
 const path = require('path');
 const sqlite3 = require('sqlite3').verbose();
 const nodemailer = require('nodemailer');
+let sgMail = null;
 const session = require('express-session');
 const cors = require('cors');
 
@@ -74,7 +75,27 @@ const otps = {}; // simple in-memory store; restart clears it
 
 // Nodemailer transport (only created if credentials provided)
 let transporter = null;
-if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+// Priority: SENDGRID_API_KEY -> Gmail creds -> log only
+if (process.env.SENDGRID_API_KEY) {
+  // Prefer SendGrid API (HTTPS) to avoid SMTP port blocking on hosts.
+  try {
+    sgMail = require('@sendgrid/mail');
+    sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+    console.log('Using SendGrid API for sending emails.');
+  } catch (e) {
+    // If require fails (package missing), fall back to SendGrid SMTP via Nodemailer
+    transporter = nodemailer.createTransport({
+      host: 'smtp.sendgrid.net',
+      port: 587,
+      secure: false,
+      auth: {
+        user: 'apikey',
+        pass: process.env.SENDGRID_API_KEY,
+      },
+    });
+    console.log('Using SendGrid SMTP for sending emails.');
+  }
+} else if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
   transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
@@ -82,18 +103,144 @@ if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
       pass: process.env.EMAIL_PASS,
     },
   });
+  console.log('Using Gmail SMTP for sending emails.');
+} else {
+  console.warn('EMAIL_USER or EMAIL_PASS not set — emails will be logged, not sent.');
+}
+require('dotenv').config();
+const express = require('express');
+const path = require('path');
+const sqlite3 = require('sqlite3').verbose();
+const nodemailer = require('nodemailer');
+let sgMail = null;
+const session = require('express-session');
+const cors = require('cors');
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// Middleware
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(cors({ origin: true, credentials: true }));
+
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET || 'change_this_secret',
+    resave: false,
+    saveUninitialized: false,
+    cookie: { maxAge: 24 * 60 * 60 * 1000 },
+  })
+);
+
+// Database (SQLite)
+const DB_PATH = path.join(__dirname, 'database.sqlite');
+const db = new sqlite3.Database(DB_PATH, (err) => {
+  if (err) {
+    console.error('Failed to open database:', err);
+    process.exit(1);
+  }
+  console.log('Connected to SQLite database.');
+});
+
+db.serialize(() => {
+  db.run('PRAGMA foreign_keys = ON');
+
+  db.run(
+    `CREATE TABLE IF NOT EXISTS customers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      email TEXT NOT NULL UNIQUE,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`
+  );
+
+  db.run(
+    `CREATE TABLE IF NOT EXISTS orders (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      customer_id INTEGER NOT NULL,
+      total REAL NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(customer_id) REFERENCES customers(id)
+    )`
+  );
+
+  db.run(
+    `CREATE TABLE IF NOT EXISTS order_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      order_id INTEGER NOT NULL,
+      company TEXT NOT NULL,
+      product TEXT NOT NULL,
+      mrp REAL NOT NULL,
+      quantity INTEGER NOT NULL,
+      line_total REAL NOT NULL,
+      FOREIGN KEY(order_id) REFERENCES orders(id)
+    )`
+  );
+});
+
+// In-memory OTP store: { email: { otp, name, expires } }
+const otps = {}; // simple in-memory store; restart clears it
+
+// Nodemailer transport (only created if credentials provided)
+let transporter = null;
+// Priority: SENDGRID_API_KEY -> Gmail creds -> log only
+if (process.env.SENDGRID_API_KEY) {
+  // Prefer SendGrid API (HTTPS) to avoid SMTP port blocking on hosts.
+  try {
+    sgMail = require('@sendgrid/mail');
+    sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+    console.log('Using SendGrid API for sending emails.');
+  } catch (e) {
+    // If require fails (package missing), fall back to SendGrid SMTP via Nodemailer
+    transporter = nodemailer.createTransport({
+      host: 'smtp.sendgrid.net',
+      port: 587,
+      secure: false,
+      auth: {
+        user: 'apikey',
+        pass: process.env.SENDGRID_API_KEY,
+      },
+    });
+    console.log('Using SendGrid SMTP for sending emails.');
+  }
+} else if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+  transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS,
+    },
+  });
+  console.log('Using Gmail SMTP for sending emails.');
 } else {
   console.warn('EMAIL_USER or EMAIL_PASS not set — emails will be logged, not sent.');
 }
 
 function sendMailAsync(mailOptions) {
   return new Promise((resolve, reject) => {
+    // If SendGrid API is available, use it (HTTPS) which avoids SMTP port blocks.
+    if (sgMail) {
+      const msg = {
+        to: mailOptions.to,
+        from: mailOptions.from || process.env.EMAIL_USER || 'no-reply@example.com',
+        subject: mailOptions.subject,
+        text: mailOptions.text,
+        html: mailOptions.html,
+      };
+      return sgMail
+        .send(msg)
+        .then((res) => resolve(res))
+        .catch((err) => reject(err));
+    }
+
     if (!transporter) {
       console.log('--- Email content (not sent because transporter missing) ---');
       console.log(mailOptions);
       console.log('--- End email ---');
       return resolve({ accepted: [], info: 'transporter-missing' });
     }
+
     transporter.sendMail(mailOptions, (err, info) => {
       if (err) return reject(err);
       resolve(info);
@@ -286,3 +433,4 @@ app.get('*', (req, res) => {
 app.listen(PORT, () => {
   console.log(`Server running at http://localhost:${PORT}`);
 });
+>>>>>>> be1b140 (Use SendGrid API for email (fallback to SMTP/logging))
