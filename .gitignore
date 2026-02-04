@@ -1,0 +1,9 @@
+# Node modules
+backend/node_modules/
+frontend/node_modules/
+
+# Local sqlite DB (do not commit)
+backend/database.sqlite
+
+# Logs
+*.log

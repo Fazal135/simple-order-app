@@ -2,8 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const path = require('path');
 const sqlite3 = require('sqlite3').verbose();
-const nodemailer = require('nodemailer');
-let sgMail = null;
+const sgMail = require('@sendgrid/mail');
 const session = require('express-session');
 const cors = require('cors');
 
@@ -75,44 +74,14 @@ const otps = {}; // simple in-memory store; restart clears it
 
 // Nodemailer transport (only created if credentials provided)
 let transporter = null;
-// Priority: SENDGRID_API_KEY -> Gmail creds -> log only
-if (process.env.SENDGRID_API_KEY) {
-  // Prefer SendGrid API (HTTPS) to avoid SMTP port blocking on hosts.
-  try {
-    sgMail = require('@sendgrid/mail');
-    sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-    console.log('Using SendGrid API for sending emails.');
-  } catch (e) {
-    // If require fails (package missing), fall back to SendGrid SMTP via Nodemailer
-    transporter = nodemailer.createTransport({
-      host: 'smtp.sendgrid.net',
-      port: 587,
-      secure: false,
-      auth: {
-        user: 'apikey',
-        pass: process.env.SENDGRID_API_KEY,
-      },
-    });
-    console.log('Using SendGrid SMTP for sending emails.');
-  }
-} else if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
-  transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
-    },
-  });
-  console.log('Using Gmail SMTP for sending emails.');
-} else {
-  console.warn('EMAIL_USER or EMAIL_PASS not set — emails will be logged, not sent.');
-}
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+console.log('Using SendGrid API for sending emails.');
 require('dotenv').config();
 const express = require('express');
 const path = require('path');
 const sqlite3 = require('sqlite3').verbose();
-const nodemailer = require('nodemailer');
 let sgMail = null;
+const sgMail = require('@sendgrid/mail');
 const session = require('express-session');
 const cors = require('cors');
 
@@ -188,34 +157,22 @@ let transporter = null;
 if (process.env.SENDGRID_API_KEY) {
   // Prefer SendGrid API (HTTPS) to avoid SMTP port blocking on hosts.
   try {
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+console.log('Using SendGrid API for sending emails.');
     sgMail = require('@sendgrid/mail');
     sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-    console.log('Using SendGrid API for sending emails.');
-  } catch (e) {
-    // If require fails (package missing), fall back to SendGrid SMTP via Nodemailer
-    transporter = nodemailer.createTransport({
-      host: 'smtp.sendgrid.net',
-      port: 587,
-      secure: false,
-      auth: {
-        user: 'apikey',
-        pass: process.env.SENDGRID_API_KEY,
-      },
-    });
-    console.log('Using SendGrid SMTP for sending emails.');
-  }
-} else if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
-  transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
-    },
-  });
-  console.log('Using Gmail SMTP for sending emails.');
-} else {
-  console.warn('EMAIL_USER or EMAIL_PASS not set — emails will be logged, not sent.');
-}
+  // Always use SendGrid API for all emails
+  const msg = {
+    to: mailOptions.to,
+    from: process.env.SHOP_OWNER_EMAIL || 'no-reply@example.com',
+    subject: mailOptions.subject,
+    text: mailOptions.text,
+    html: mailOptions.html,
+  };
+  return sgMail
+    .send(msg)
+    .then((res) => res)
+    .catch((err) => { console.error('SendGrid error:', err); throw err; });
 
 function sendMailAsync(mailOptions) {
   return new Promise((resolve, reject) => {
@@ -279,34 +236,20 @@ app.post('/api/send-otp', async (req, res) => {
     };
 
     try {
-      await sendMailAsync(mailOptions);
-      return res.json({ success: true, message: 'OTP sent (or logged). Check your email.' });
-    } catch (e) {
-      console.error('Failed to send OTP email:', e);
-      return res.status(500).json({ success: false, error: 'Failed to send OTP email. Check server logs.' });
-    }
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, error: 'Server error' });
-  }
-});
-
-// API: verify OTP
-app.post('/api/verify-otp', (req, res) => {
-  try {
-    const { email, otp } = req.body;
-    if (!email || !otp) return res.status(400).json({ success: false, error: 'Email and OTP are required' });
-
-    const record = otps[email];
-    if (!record) return res.status(400).json({ success: false, error: 'No OTP requested for this email' });
-    if (Date.now() > record.expires) {
-      delete otps[email];
-      return res.status(400).json({ success: false, error: 'OTP expired' });
-    }
-    if (record.otp !== otp) return res.status(400).json({ success: false, error: 'Invalid OTP' });
-
-    // OTP valid — create or get customer
-    db.get('SELECT id FROM customers WHERE email = ?', [email], (err, row) => {
+      function sendMailAsync(mailOptions) {
+        // Always use SendGrid API for all emails
+        const msg = {
+          to: mailOptions.to,
+          from: process.env.SHOP_OWNER_EMAIL || 'no-reply@example.com',
+          subject: mailOptions.subject,
+          text: mailOptions.text,
+          html: mailOptions.html,
+        };
+        return sgMail
+          .send(msg)
+          .then((res) => res)
+          .catch((err) => { console.error('SendGrid error:', err); throw err; });
+      }
       if (err) {
         console.error('DB error:', err);
         return res.status(500).json({ success: false, error: 'Database error' });

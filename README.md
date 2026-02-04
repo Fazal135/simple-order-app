@@ -28,17 +28,7 @@ Quick start (Windows):
 ```powershell
 cd "C:/Users/fazal/OneDrive/Desktop/shah/simple-order-app/backend"
 npm install
-# Copy .env.example to .env and edit values (EMAIL_USER, EMAIL_PASS, SHOP_OWNER_EMAIL)
-copy .env.example .env
+# Copy [.env.example](http://_vscodecontentref_/2) to .env and edit values (EMAIL_USER, EMAIL_PASS, SHOP_OWNER_EMAIL)
+copy [.env.example](http://_vscodecontentref_/3) .env
 # Edit .env in a text editor and set EMAIL_USER and EMAIL_PASS (Gmail app password recommended)
 npm start
-```
-
-3. Open the app in your browser: http://localhost:3000/
-
-Important notes & common problems:
-
-- Email sending requires Gmail credentials. Create an app password for your Google account (recommended). If `EMAIL_USER`/`EMAIL_PASS` are not set, emails will be logged to the server console instead of being sent.
-- SQLite database file `database.sqlite` will be created automatically in `backend/`.
-- OTPs are stored in memory and expire after 5 minutes. If the server restarts, pending OTPs are lost.
-- This is a minimal local app for learning and prototyping. Do not use in production without security hardening.

@@ -1,3 +1,56 @@
+<<<<<<< HEAD
+    } else {
+      loginMsg.textContent = resp.error || 'Failed to send OTP';
+    }
+  });
+
+  // Verify OTP
+  verifyBtn.addEventListener('click', async () => {
+    loginMsg.textContent = '';
+    const email = emailInput.value.trim();
+    const otp = otpInput.value.trim();
+    if (!email || !otp) { loginMsg.textContent = 'Email and OTP required'; return; }
+    const resp = await api('/api/verify-otp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, otp }) });
+    if (resp.success) {
+      // show order view
+      loginView.style.display = 'none';
+      orderView.style.display = 'block';
+      fetchCatalog();
+    } else {
+      loginMsg.textContent = resp.error || 'OTP verification failed';
+    }
+  });
+
+  async function fetchCatalog() {
+    const resp = await api('/api/products');
+    if (resp.success) {
+      catalog = resp.catalog || {};
+      mrps = resp.mrps || [20,30,40];
+      populateCompanies();
+    } else {
+      orderMsg.textContent = 'Failed to load products';
+    }
+  }
+
+  function populateCompanies() {
+    companySelect.innerHTML = '';
+    Object.keys(catalog).forEach((c) => {
+      const o = document.createElement('option'); o.value = c; o.textContent = c; companySelect.appendChild(o);
+    });
+    onCompanyChange();
+  }
+
+    const resp = await api('/api/place-order', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cart }) });
+    if (resp.success) {
+      orderMsg.textContent = `Order placed successfully. Order ID: ${resp.orderId}. Total: ${resp.total}`;
+      cart.length = 0; renderCart();
+    } else {
+      orderMsg.textContent = resp.error || 'Failed to place order';
+    }
+  });
+
+})();
+=======
 // Simple frontend JS for login with OTP and order placement
 (function () {
   const q = (s) => document.querySelector(s);
@@ -26,7 +79,6 @@
 
   async function api(path, opts) {
     const res = await fetch(path, Object.assign({ credentials: 'include' }, opts));
-    return res.json();
   }
 
   // Send OTP
@@ -131,3 +183,4 @@
   });
 
 })();
+>>>>>>> 2cc4507 (Backup all local files before syncing with remote)

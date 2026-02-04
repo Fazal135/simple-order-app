@@ -1,44 +1,4 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Simple Shop Order</title>
-    <link rel="stylesheet" href="styles.css" />
-  </head>
-  <body>
-    <div class="container">
-      <h1>Simple Shop Order</h1>
-
-      <div id="login-view">
-        <h2>Login (Email OTP)</h2>
-        <div class="form-row">
-          <label>Name</label>
-          <input id="name" type="text" />
-        </div>
-        <div class="form-row">
-          <label>Email</label>
-          <input id="email" type="email" />
-        </div>
-        <div class="form-row">
-          <button id="send-otp">Send OTP</button>
-        </div>
-
-        <div id="otp-section" style="display:none;">
-          <div class="form-row">
-            <label>Enter OTP</label>
-            <input id="otp" type="text" />
-          </div>
-          <div class="form-row">
-            <button id="verify-otp">Verify OTP</button>
-          </div>
-        </div>
-
-        <div id="login-msg" class="msg"></div>
-      </div>
-
-      <div id="order-view" style="display:none;">
-        <h2>Place Order</h2>
+<<<<<<< HEAD
 
         <div class="form-row">
           <label>Company</label>
@@ -78,8 +38,52 @@
       <div id="warn" class="warning">
         <strong>Warning:</strong> To send emails you must set Gmail credentials in backend/.env (see README).
       </div>
-    </div>
 
     <script src="app.js"></script>
   </body>
 </html>
+=======
+
+        <div class="form-row">
+          <label>Company</label>
+          <select id="company-select"></select>
+        </div>
+        <div class="form-row">
+          <label>Product</label>
+          <select id="product-select"></select>
+        </div>
+        <div class="form-row">
+          <label>MRP</label>
+          <select id="mrp-select"></select>
+        </div>
+        <div class="form-row">
+          <label>Quantity</label>
+          <input id="quantity" type="number" min="1" value="1" />
+        </div>
+        <div class="form-row">
+          <button id="add-to-cart">Add to Cart</button>
+        </div>
+
+        <h3>Cart</h3>
+        <table id="cart-table">
+          <thead><tr><th>Company</th><th>Product</th><th>MRP</th><th>Qty</th><th>Line</th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <div class="form-row">
+          <strong>Grand Total: </strong><span id="grand-total">0</span>
+        </div>
+        <div class="form-row">
+          <button id="place-order">Place Order</button>
+        </div>
+
+        <div id="order-msg" class="msg"></div>
+      </div>
+
+      <div id="warn" class="warning">
+        <strong>Warning:</strong> To send emails you must set Gmail credentials in backend/.env (see README).
+      </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
+>>>>>>> 2cc4507 (Backup all local files before syncing with remote)
