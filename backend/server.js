@@ -569,6 +569,291 @@ app.get('*', (req, res) => {
 app.listen(PORT, () => {
   console.log(`Server running at http://localhost:${PORT}`);
 });require('dotenv').config();
+
+const express = require('express');
+const path = require('path');
+const sqlite3 = require('sqlite3').verbose();
+const session = require('express-session');
+const cors = require('cors');
+const sgMail = require('@sendgrid/mail');
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// Middleware
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(cors({ origin: true, credentials: true }));
+
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET || 'change_this_secret',
+    resave: false,
+    saveUninitialized: false,
+    cookie: { maxAge: 24 * 60 * 60 * 1000 },
+  })
+);
+
+// Database (SQLite)
+const DB_PATH = path.join(__dirname, 'database.sqlite');
+const db = new sqlite3.Database(DB_PATH, (err) => {
+  if (err) {
+    console.error('Failed to open database:', err);
+    process.exit(1);
+  }
+  console.log('Connected to SQLite database.');
+});
+
+db.serialize(() => {
+  db.run('PRAGMA foreign_keys = ON');
+
+  db.run(
+    `CREATE TABLE IF NOT EXISTS customers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      email TEXT NOT NULL UNIQUE,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`
+  );
+
+  db.run(
+    `CREATE TABLE IF NOT EXISTS orders (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      customer_id INTEGER NOT NULL,
+      total REAL NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(customer_id) REFERENCES customers(id)
+    )`
+  );
+
+  db.run(
+    `CREATE TABLE IF NOT EXISTS order_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      order_id INTEGER NOT NULL,
+      company TEXT NOT NULL,
+      product TEXT NOT NULL,
+      mrp REAL NOT NULL,
+      quantity INTEGER NOT NULL,
+      line_total REAL NOT NULL,
+      FOREIGN KEY(order_id) REFERENCES orders(id)
+    )`
+  );
+});
+
+// In-memory OTP store: { email: { otp, name, expires } }
+const otps = {}; // simple in-memory store; restart clears it
+
+// SendGrid setup (API only)
+const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
+const EMAIL_FROM = process.env.SHOP_OWNER_EMAIL || 'no-reply@example.com';
+
+if (SENDGRID_API_KEY) {
+  sgMail.setApiKey(SENDGRID_API_KEY);
+  console.log('Using SendGrid API for sending emails.');
+} else {
+  console.warn('SENDGRID_API_KEY not set — emails will be logged, not sent.');
+}
+
+function sendMailAsync(mailOptions) {
+  const msg = {
+    to: mailOptions.to,
+    from: mailOptions.from || EMAIL_FROM,
+    subject: mailOptions.subject,
+    text: mailOptions.text,
+    html: mailOptions.html,
+  };
+
+  if (!SENDGRID_API_KEY) {
+    console.log('--- Email content (not sent) ---');
+    console.log(msg);
+    console.log('--- End email ---');
+    return Promise.resolve({ accepted: [], info: 'sendgrid-not-configured' });
+  }
+
+  return sgMail.send(msg);
+}
+
+// Serve frontend static files
+const FRONTEND_PATH = path.join(__dirname, '..', 'frontend');
+app.use(express.static(FRONTEND_PATH));
+
+// Simple in-memory products catalog
+const CATALOG = {
+  Classmate: ['Executive Hindi', 'Executive English', 'Mathematics', 'Register', 'A4 Copy'],
+  Navneet: ['Drawing Book', 'Notebook 200pg', 'Sketch Book'],
+  Camlin: ['Pencil', 'Eraser', 'Sharpener', 'Colors'],
+};
+
+const MRPS = [20, 30, 40];
+
+// API: send OTP
+app.post('/api/send-otp', async (req, res) => {
+  try {
+    const { name, email } = req.body;
+    if (!name || !email) return res.status(400).json({ success: false, error: 'Name and email required' });
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expires = Date.now() + 5 * 60 * 1000; // 5 minutes
+    otps[email] = { otp, name, expires };
+
+    const mailOptions = {
+      to: email,
+      subject: 'Your OTP for Shop Order',
+      text: `Hello ${name},\n\nYour OTP is ${otp}. It expires in 5 minutes.\n\nThank you.`,
+    };
+
+    try {
+      await sendMailAsync(mailOptions);
+    } catch (err) {
+      console.error('Failed to send OTP email:', err);
+      return res.status(500).json({ success: false, error: 'Failed to send OTP email' });
+    }
+
+    return res.json({ success: true, message: 'OTP sent' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, error: 'Server error' });
+  }
+});
+
+// API: verify OTP
+app.post('/api/verify-otp', (req, res) => {
+  try {
+    const { email, otp } = req.body;
+    if (!email || !otp) return res.status(400).json({ success: false, error: 'Email and OTP required' });
+
+    const record = otps[email];
+    if (!record) return res.status(400).json({ success: false, error: 'OTP not found or expired' });
+    if (Date.now() > record.expires) {
+      delete otps[email];
+      return res.status(400).json({ success: false, error: 'OTP expired' });
+    }
+    if (record.otp !== otp) return res.status(400).json({ success: false, error: 'Invalid OTP' });
+
+    db.get('SELECT id, name FROM customers WHERE email = ?', [email], (err, row) => {
+      if (err) {
+        console.error('DB error:', err);
+        return res.status(500).json({ success: false, error: 'Database error' });
+      }
+
+      const finishWithCustomerId = (customerId, customerName) => {
+        req.session.customerId = customerId;
+        req.session.customerName = customerName;
+        req.session.customerEmail = email;
+        delete otps[email];
+        return res.json({ success: true, message: 'OTP verified' });
+      };
+
+      if (row) {
+        return finishWithCustomerId(row.id, row.name);
+      }
+
+      db.run('INSERT INTO customers (name, email) VALUES (?, ?)', [record.name, email], function (err2) {
+        if (err2) {
+          console.error('Insert customer failed:', err2);
+          return res.status(500).json({ success: false, error: 'Failed to create customer' });
+        }
+        return finishWithCustomerId(this.lastID, record.name);
+      });
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, error: 'Server error' });
+  }
+});
+
+// API: get products
+app.get('/api/products', (req, res) => {
+  res.json({ success: true, catalog: CATALOG, mrps: MRPS });
+});
+
+// API: place order
+app.post('/api/place-order', (req, res) => {
+  try {
+    const customerId = req.session.customerId;
+    const customerName = req.session.customerName;
+    const customerEmail = req.session.customerEmail;
+    if (!customerId) return res.status(401).json({ success: false, error: 'Not authenticated' });
+
+    const { cart } = req.body;
+    if (!Array.isArray(cart) || cart.length === 0) return res.status(400).json({ success: false, error: 'Cart is empty' });
+
+    // Calculate totals
+    let total = 0;
+    const items = cart.map((it) => {
+      const mrp = Number(it.mrp) || 0;
+      const qty = parseInt(it.quantity, 10) || 0;
+      const line = mrp * qty;
+      total += line;
+      return { company: it.company, product: it.product, mrp: mrp, quantity: qty, line_total: line };
+    });
+
+    db.run('INSERT INTO orders (customer_id, total) VALUES (?, ?)', [customerId, total], function (err) {
+      if (err) {
+        console.error('Insert order failed:', err);
+        return res.status(500).json({ success: false, error: 'Failed to create order' });
+      }
+
+      const orderId = this.lastID;
+      const stmt = db.prepare('INSERT INTO order_items (order_id, company, product, mrp, quantity, line_total) VALUES (?, ?, ?, ?, ?, ?)');
+      items.forEach((it) => {
+        stmt.run(orderId, it.company, it.product, it.mrp, it.quantity, it.line_total);
+      });
+      stmt.finalize(async (finalizeErr) => {
+        if (finalizeErr) console.error('Finalize stmt error:', finalizeErr);
+
+        const orderRowsHtml = items
+          .map((it) => `<tr><td>${it.company}</td><td>${it.product}</td><td>${it.mrp}</td><td>${it.quantity}</td><td>${it.line_total}</td></tr>`)
+          .join('');
+        const html = `<p>Hi ${customerName},</p>
+          <p>Thank you for your order. Order ID: <strong>${orderId}</strong></p>
+          <table border="1" cellpadding="6" cellspacing="0">
+            <thead><tr><th>Company</th><th>Product</th><th>MRP</th><th>Qty</th><th>Line Total</th></tr></thead>
+            <tbody>${orderRowsHtml}</tbody>
+          </table>
+          <p><strong>Total: ${total}</strong></p>
+        `;
+
+        const mailToCustomer = {
+          to: customerEmail,
+          subject: `Order Confirmation (#${orderId})`,
+          html,
+        };
+
+        const mailToOwner = {
+          to: process.env.SHOP_OWNER_EMAIL || 'shopowner@gmail.com',
+          subject: `New Order (#${orderId}) by ${customerName}`,
+          html: `<p>New order received. Customer: ${customerName} (${customerEmail})</p>` + html,
+        };
+
+        try {
+          await sendMailAsync(mailToCustomer);
+        } catch (e) {
+          console.error('Failed to send email to customer:', e);
+        }
+        try {
+          await sendMailAsync(mailToOwner);
+        } catch (e) {
+          console.error('Failed to send email to owner:', e);
+        }
+
+        return res.json({ success: true, orderId, total });
+      });
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, error: 'Server error' });
+  }
+});
+
+// Fallback - serve index.html for SPA
+app.get('*', (req, res) => {
+  res.sendFile(path.join(FRONTEND_PATH, 'index.html'));
+});
+
+app.listen(PORT, () => {
+  console.log(`Server running at http://localhost:${PORT}`);
+});require('dotenv').config();
 // ...existing code...
 // ...existing code...
 // ...existing code...
