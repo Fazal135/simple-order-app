@@ -3,7 +3,7 @@ require('dotenv').config();
 // ...existing code...
 // ...existing code...
 const sgMail = require('@sendgrid/mail');
-const session = require('express-session');
+// ...existing code...
 const cors = require('cors');
 
 const app = express();
@@ -81,7 +81,7 @@ require('dotenv').config();
 // Removed duplicate path declaration
 // Removed duplicate sqlite3 declaration
 // ...existing code...
-const session = require('express-session');
+// Removed duplicate session declaration
 const cors = require('cors');
 
 const app = express();
