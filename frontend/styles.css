@@ -1,4 +1,13 @@
-<<<<<<< HEAD
+body { font-family: Arial, sans-serif; background:#f8f8f8; }
+.container{ width:720px; margin:30px auto; background:#fff; padding:20px; box-shadow:0 0 6px rgba(0,0,0,0.1);} 
+.form-row{ margin:8px 0; }
+label{ display:block; margin-bottom:4px; }
+input, select, button{ padding:8px; font-size:14px; }
+button{ cursor:pointer; }
+table{ width:100%; border-collapse:collapse; margin-top:10px; }
+th,td{ border:1px solid #ddd; padding:6px; text-align:left; }
+.msg{ margin-top:8px; color:green; }
+.warning{ margin-top:14px; color:darkred; }<<<<<<< HEAD
 body { font-family: Arial, sans-serif; background:#f8f8f8; }
 .container{ width:720px; margin:30px auto; background:#fff; padding:20px; box-shadow:0 0 6px rgba(0,0,0,0.1);} 
 .form-row{ margin:8px 0; }
