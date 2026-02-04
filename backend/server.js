@@ -4,7 +4,7 @@ require('dotenv').config();
 // ...existing code...
 const sgMail = require('@sendgrid/mail');
 // ...existing code...
-const cors = require('cors');
+// ...existing code...
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -82,7 +82,7 @@ require('dotenv').config();
 // Removed duplicate sqlite3 declaration
 // ...existing code...
 // Removed duplicate session declaration
-const cors = require('cors');
+// Removed duplicate cors declaration
 
 const app = express();
 const PORT = process.env.PORT || 3000;
