@@ -1,5 +1,6 @@
 // Simple frontend JS for login with OTP and order placement
 (function () {
+
   const q = (s) => document.querySelector(s);
 
   const sendBtn = q('#send-otp');
@@ -24,15 +25,46 @@
 
   let catalog = {};
   let mrps = [];
+
   const cart = [];
 
+  // ---------------- API helper ----------------
   async function api(path, opts) {
     const res = await fetch(path, Object.assign({ credentials: 'include' }, opts));
     return res.json();
   }
 
+  // ---------------- cart persistence ----------------
+  function saveCart() {
+    localStorage.setItem('cart', JSON.stringify(cart));
+  }
+
+  function loadCart() {
+    const saved = localStorage.getItem('cart');
+    if (!saved) return;
+
+    try {
+      const arr = JSON.parse(saved);
+      cart.length = 0;
+      arr.forEach(i => cart.push(i));
+      renderCart();
+    } catch (e) {}
+  }
+
+  function showLastOrderMessage() {
+    const last = localStorage.getItem('lastOrder');
+    if (!last) return;
+
+    try {
+      const data = JSON.parse(last);
+      orderMsg.textContent =
+        `Last order placed successfully (Order ID: ${data.orderId}, Total: ${data.total}). You can place a new order.`;
+    } catch (e) {}
+  }
+
   // ---------------- SEND OTP ----------------
   sendBtn.addEventListener('click', async () => {
+
     if (sendBtn.disabled) return;
     sendBtn.disabled = true;
 
@@ -69,6 +101,7 @@
 
   // ---------------- VERIFY OTP ----------------
   verifyBtn.addEventListener('click', async () => {
+
     if (verifyBtn.disabled) return;
     verifyBtn.disabled = true;
 
@@ -94,6 +127,8 @@
         loginView.style.display = 'none';
         orderView.style.display = 'block';
         await fetchCatalog();
+        loadCart();
+        showLastOrderMessage();
       } else {
         loginMsg.textContent = resp.error || 'OTP verification failed';
       }
@@ -104,7 +139,23 @@
     verifyBtn.disabled = false;
   });
 
-  // ---------------- PRODUCTS ----------------
+  // ---------------- check session on load ----------------
+  (async function checkLoginOnLoad() {
+    try {
+      const res = await fetch('/api/me', { credentials: 'include' });
+      const data = await res.json();
+
+      if (data.loggedIn) {
+        loginView.style.display = 'none';
+        orderView.style.display = 'block';
+        await fetchCatalog();
+        loadCart();
+        showLastOrderMessage();
+      }
+    } catch (e) {}
+  })();
+
+  // ---------------- products ----------------
   async function fetchCatalog() {
     const resp = await api('/api/products');
 
@@ -159,8 +210,9 @@
 
   companySelect.addEventListener('change', onCompanyChange);
 
-  // ---------------- CART ----------------
+  // ---------------- cart ----------------
   addToCartBtn.addEventListener('click', () => {
+
     const company = companySelect.value;
     const product = productSelect.value;
     const mrp = Number(mrpSelect.value);
@@ -182,11 +234,13 @@
     });
 
     renderCart();
+    saveCart();
     orderMsg.textContent = '';
   });
 
   function renderCart() {
     cartTableBody.innerHTML = '';
+
     let total = 0;
 
     cart.forEach((it) => {
@@ -206,8 +260,9 @@
     grandTotalEl.textContent = total;
   }
 
-  // ---------------- PLACE ORDER ----------------
+  // ---------------- place order ----------------
   placeOrderBtn.addEventListener('click', async () => {
+
     if (placeOrderBtn.disabled) return;
     placeOrderBtn.disabled = true;
 
@@ -225,35 +280,30 @@
       });
 
       if (resp.success) {
+
+        localStorage.removeItem('cart');
+
+        localStorage.setItem('lastOrder', JSON.stringify({
+          orderId: resp.orderId,
+          total: resp.total,
+          time: Date.now()
+        }));
+
         orderMsg.textContent =
           `Order placed successfully. Order ID: ${resp.orderId}. Total: ${resp.total}`;
 
         cart.length = 0;
         renderCart();
+
       } else {
         orderMsg.textContent = resp.error || 'Failed to place order';
       }
+
     } catch (e) {
       orderMsg.textContent = 'Network error';
     }
 
     placeOrderBtn.disabled = false;
   });
-
-// ---------------- CHECK LOGIN ON PAGE LOAD ----------------
-(async function checkLoginOnLoad() {
-  try {
-    const res = await fetch('/api/me', { credentials: 'include' });
-    const data = await res.json();
-
-    if (data.loggedIn) {
-      loginView.style.display = 'none';
-      orderView.style.display = 'block';
-      await fetchCatalog();
-    }
-  } catch (e) {
-    // ignore
-  }
-})();
 
 })();
