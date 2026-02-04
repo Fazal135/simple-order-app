@@ -8,8 +8,6 @@ const cors = require('cors');
 const sgMail = require('@sendgrid/mail');
 
 const app = express();
-
-/* ✅ REQUIRED for Render / HTTPS */
 app.set('trust proxy', 1);
 
 const PORT = process.env.PORT || 3000;
@@ -19,7 +17,6 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cors({ origin: true, credentials: true }));
 
-/* ✅ FIXED SESSION CONFIG */
 app.use(
   session({
     name: 'shop.sid',
@@ -281,28 +278,64 @@ app.post('/api/place-order', (req, res) => {
 
       stmt.finalize(async () => {
 
-        const rows = items.map(i =>
-          `<tr><td>${i.company}</td><td>${i.product}</td><td>${i.mrp}</td><td>${i.quantity}</td><td>${i.line_total}</td></tr>`
-        ).join('');
+        /* =========================================================
+           ONLY CHANGE: structured table email (customer + owner)
+           ========================================================= */
 
-        const html = `
-          <p>Hi ${customerName}</p>
-          <p>Order ID: ${orderId}</p>
-          <table border="1">${rows}</table>
-          <p>Total: ${total}</p>
+        const rows = items.map(i => `
+          <tr>
+            <td>${i.company}</td>
+            <td>${i.product}</td>
+            <td>${i.mrp}</td>
+            <td>${i.quantity}</td>
+            <td>${i.line_total}</td>
+          </tr>
+        `).join('');
+
+        const htmlTable = `
+          <p>Hi ${customerName},</p>
+          <p>Thank you for your order.</p>
+          <p><strong>Order ID:</strong> ${orderId}</p>
+
+          <table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;">
+            <thead>
+              <tr>
+                <th>Company</th>
+                <th>Product</th>
+                <th>MRP</th>
+                <th>Qty</th>
+                <th>Line Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colspan="4"><strong>Total</strong></td>
+                <td><strong>${total}</strong></td>
+              </tr>
+            </tfoot>
+          </table>
         `;
 
         await sendMailAsync({
           to: customerEmail,
           subject: `Order Confirmation (#${orderId})`,
-          html
+          html: htmlTable
         });
 
         await sendMailAsync({
           to: process.env.SHOP_OWNER_EMAIL,
-          subject: `New Order (#${orderId})`,
-          html
+          subject: `New Order (#${orderId}) by ${customerName}`,
+          html: `
+            <p>New order received.</p>
+            <p><strong>Customer:</strong> ${customerName} (${customerEmail})</p>
+            ${htmlTable}
+          `
         });
+
+        /* ========================================================= */
 
         res.json({ success: true, orderId, total });
       });
