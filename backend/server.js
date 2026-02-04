@@ -80,8 +80,7 @@ require('dotenv').config();
 // Removed duplicate express declaration
 // Removed duplicate path declaration
 // Removed duplicate sqlite3 declaration
-let sgMail = null;
-const sgMail = require('@sendgrid/mail');
+// ...existing code...
 const session = require('express-session');
 const cors = require('cors');
 
@@ -157,10 +156,9 @@ let transporter = null;
 if (process.env.SENDGRID_API_KEY) {
   // Prefer SendGrid API (HTTPS) to avoid SMTP port blocking on hosts.
   try {
-sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+// ...existing code...
 console.log('Using SendGrid API for sending emails.');
-    sgMail = require('@sendgrid/mail');
-    sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+    // ...existing code...
   // Always use SendGrid API for all emails
   const msg = {
     to: mailOptions.to,
