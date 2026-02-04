@@ -1,6 +1,6 @@
 require('dotenv').config();
 // ...existing code...
-const path = require('path');
+// ...existing code...
 const sqlite3 = require('sqlite3').verbose();
 const sgMail = require('@sendgrid/mail');
 const session = require('express-session');
@@ -78,7 +78,7 @@ sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 console.log('Using SendGrid API for sending emails.');
 require('dotenv').config();
 // Removed duplicate express declaration
-const path = require('path');
+// Removed duplicate path declaration
 const sqlite3 = require('sqlite3').verbose();
 let sgMail = null;
 const sgMail = require('@sendgrid/mail');
