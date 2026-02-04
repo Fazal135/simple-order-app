@@ -38,7 +38,18 @@ db.serialize(() => {
 
   db.run(
     `CREATE TABLE IF NOT EXISTS customers (
+  const sgMail = require('@sendgrid/mail');
+  // ...existing code...
+  // Removed duplicate dotenv require
+  // ...existing code...
+  // Removed duplicate express declaration
+  // Removed duplicate path declaration
+  // Removed duplicate sqlite3 declaration
+  // ...existing code...
+  // Removed duplicate session declaration
+  // Removed duplicate cors declaration
       id INTEGER PRIMARY KEY AUTOINCREMENT,
+  const PORT = process.env.PORT || 3000;
       name TEXT NOT NULL,
       email TEXT NOT NULL UNIQUE,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
