@@ -118,9 +118,9 @@ const MRPS = [20, 30, 40];
 
 // API: send OTP
 app.post('/api/send-otp', async (req, res) => {
+  console.log('OTP request received');
   try {
     const { name, email } = req.body;
-    console.log('OTP request received:', { name, email });
     if (!name || !email) return res.status(400).json({ success: false, error: 'Name and email required' });
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
