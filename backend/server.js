@@ -6,7 +6,7 @@ const sgMail = require('@sendgrid/mail');
 // ...existing code...
 // ...existing code...
 
-const app = express();
+// ...existing code...
 const PORT = process.env.PORT || 3000;
 
 // Middleware
@@ -84,7 +84,7 @@ require('dotenv').config();
 // Removed duplicate session declaration
 // Removed duplicate cors declaration
 
-const app = express();
+// Removed duplicate app declaration
 const PORT = process.env.PORT || 3000;
 
 // Middleware
