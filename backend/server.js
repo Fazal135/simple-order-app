@@ -120,6 +120,7 @@ const MRPS = [20, 30, 40];
 app.post('/api/send-otp', async (req, res) => {
   try {
     const { name, email } = req.body;
+    console.log('OTP request received:', { name, email });
     if (!name || !email) return res.status(400).json({ success: false, error: 'Name and email required' });
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
@@ -133,7 +134,8 @@ app.post('/api/send-otp', async (req, res) => {
     };
 
     try {
-      await sendMailAsync(mailOptions);
+      const result = await sendMailAsync(mailOptions);
+      console.log('OTP email send result:', result);
     } catch (err) {
       console.error('Failed to send OTP email:', err);
       return res.status(500).json({ success: false, error: 'Failed to send OTP email' });
