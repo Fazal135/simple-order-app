@@ -283,6 +283,19 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(FRONTEND_PATH, 'index.html'));
 });
 
+// API: check current session (stay logged in after reload)
+app.get('/api/me', (req, res) => {
+  if (req.session && req.session.customerId) {
+    return res.json({
+      loggedIn: true,
+      name: req.session.customerName,
+      email: req.session.customerEmail
+    });
+  }
+
+  return res.json({ loggedIn: false });
+});
+
 app.listen(PORT, () => {
   console.log(`Server running at http://localhost:${PORT}`);
 });

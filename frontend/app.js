@@ -240,4 +240,20 @@
     placeOrderBtn.disabled = false;
   });
 
+// ---------------- CHECK LOGIN ON PAGE LOAD ----------------
+(async function checkLoginOnLoad() {
+  try {
+    const res = await fetch('/api/me', { credentials: 'include' });
+    const data = await res.json();
+
+    if (data.loggedIn) {
+      loginView.style.display = 'none';
+      orderView.style.display = 'block';
+      await fetchCatalog();
+    }
+  } catch (e) {
+    // ignore
+  }
+})();
+
 })();
